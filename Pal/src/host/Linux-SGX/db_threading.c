@@ -159,7 +159,7 @@ int _DkThreadSetCPUAffinity(PAL_HANDLE thread, PAL_NUM cpu_num, PAL_PTR cpu_mask
         tid = 0;
     } else {
         /* TODO: add actual host_tid to pal_thread handle and use it here */
-        tid = thread->thread.tid;
+        tid = 0;
     }
 
     int ret = ocall_sched_setaffinity(tid, cpu_num, cpu_mask);
@@ -174,7 +174,7 @@ int _DkThreadGetCPUAffinity(PAL_HANDLE thread, PAL_NUM cpu_num, PAL_PTR cpu_mask
         tid = 0;
     } else {
         /* TODO: add actual host_tid to pal_thread handle and use it here */
-        tid = thread->thread.tid;
+        tid = 0;
     }
 
     int ret = ocall_sched_getaffinity(tid, cpu_num, cpu_mask);
