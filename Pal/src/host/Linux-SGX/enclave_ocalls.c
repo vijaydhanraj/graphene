@@ -781,7 +781,7 @@ int ocall_resume_thread (void * tcs)
     return sgx_exitless_ocall(OCALL_RESUME_THREAD, tcs);
 }
 
-int ocall_sched_setaffinity (uint64_t tid, uint64_t cpu_num, void * cpu_mask)
+int ocall_sched_setaffinity (uint64_t tid, uint64_t cpu_len, void * cpu_mask)
 {
     int retval = 0;
     ms_ocall_sched_setaffinity_t* ms;
@@ -794,8 +794,8 @@ int ocall_sched_setaffinity (uint64_t tid, uint64_t cpu_num, void * cpu_mask)
     }
 
     WRITE_ONCE(ms->ms_tid, tid);
-    WRITE_ONCE(ms->ms_cpu_num, cpu_num);
-    void* untrusted_cpu_mask = sgx_copy_to_ustack(cpu_mask, cpu_num);
+    WRITE_ONCE(ms->ms_cpu_len, cpu_len);
+    void* untrusted_cpu_mask = sgx_copy_to_ustack(cpu_mask, cpu_len);
     if (!untrusted_cpu_mask) {
         sgx_reset_ustack(old_ustack);
         return -EPERM;
@@ -810,7 +810,7 @@ int ocall_sched_setaffinity (uint64_t tid, uint64_t cpu_num, void * cpu_mask)
     return retval;
 }
 
-int ocall_sched_getaffinity (uint64_t tid, uint64_t cpu_num, void * cpu_mask)
+int ocall_sched_getaffinity (uint64_t tid, uint64_t cpu_len, void * cpu_mask)
 {
     int retval = 0;
     ms_ocall_sched_getaffinity_t* ms;
@@ -823,8 +823,8 @@ int ocall_sched_getaffinity (uint64_t tid, uint64_t cpu_num, void * cpu_mask)
     }
 
     WRITE_ONCE(ms->ms_tid, tid);
-    WRITE_ONCE(ms->ms_cpu_num, cpu_num);
-    void* untrusted_cpu_mask = sgx_copy_to_ustack(cpu_mask, cpu_num);
+    WRITE_ONCE(ms->ms_cpu_len, cpu_len);
+    void* untrusted_cpu_mask = sgx_copy_to_ustack(cpu_mask, cpu_len);
     if (!untrusted_cpu_mask) {
         sgx_reset_ustack(old_ustack);
         return -EPERM;
@@ -835,7 +835,7 @@ int ocall_sched_getaffinity (uint64_t tid, uint64_t cpu_num, void * cpu_mask)
                         sgx_exitless_ocall(OCALL_SCHED_GETAFFINITY, ms);
 
     if (retval > 0) {
-        retval = sgx_copy_to_enclave(cpu_mask, cpu_num,
+        retval = sgx_copy_to_enclave(cpu_mask, cpu_len,
                                      READ_ONCE(ms->ms_cpu_mask), retval);
     }
 
