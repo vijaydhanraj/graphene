@@ -181,6 +181,6 @@ int _DkThreadGetCPUAffinity(PAL_HANDLE thread, PAL_NUM cpu_len, PAL_PTR cpu_mask
     return IS_ERR(ret) ? unix_to_pal_error(ERRNO(ret)) : ret;
 }
 
-struct handle_ops thread_ops = {
+struct handle_ops g_thread_ops = {
     /* nothing */
 };
