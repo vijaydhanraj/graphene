@@ -73,7 +73,7 @@ int ocall_sched_setaffinity(uint64_t tid, uint64_t cpu_len, void* cpu_mask);
 
 int ocall_sched_getaffinity(uint64_t tid, uint64_t cpu_len, void* cpu_mask);
 
-int ocall_clone_thread (void);
+int ocall_clone_thread (PAL_IDX* tid);
 
 int ocall_create_process(const char* uri, int nargs, const char** args, int* stream_fd, unsigned int* pid);
 

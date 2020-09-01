@@ -844,10 +844,26 @@ int ocall_sched_getaffinity (uint64_t tid, size_t cpu_len, void * cpu_mask)
     return retval;
 }
 
-int ocall_clone_thread (void)
+int ocall_clone_thread (PAL_IDX* tid)
 {
-    void* dummy = NULL;
-    return sgx_exitless_ocall(OCALL_CLONE_THREAD, dummy);
+    int retval = 0; 
+    ms_ocall_clone_thread_t* ms;
+
+    void* old_ustack = sgx_prepare_ustack();
+    ms = sgx_alloc_on_ustack_aligned(sizeof(*ms), alignof(*ms));
+    if (!ms) {
+        sgx_reset_ustack(old_ustack);
+        return -EPERM;
+    }
+
+    retval = sgx_exitless_ocall(OCALL_CLONE_THREAD, ms);
+
+    if (!retval) {
+        *tid = READ_ONCE(ms->ms_tid);
+    }
+
+    sgx_reset_ustack(old_ustack);
+    return retval;
 }
 
 int ocall_create_process(const char* uri, int nargs, const char** args, int* stream_fd, unsigned int* pid) {

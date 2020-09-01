@@ -283,9 +283,9 @@ static long sgx_ocall_sched_getaffinity(void* pms)
 
 static long sgx_ocall_clone_thread(void * pms)
 {
-    __UNUSED(pms);
+    ms_ocall_clone_thread_t* ms = (ms_ocall_clone_thread_t*) pms;
     ODEBUG(OCALL_CLONE_THREAD, pms);
-    return clone_thread();
+    return clone_thread(&ms->ms_tid);
 }
 
 static long sgx_ocall_create_process(void * pms)

@@ -138,7 +138,7 @@ int shim_do_sched_rr_get_interval(pid_t pid, struct timespec* interval) {
     return 0;
 }
 
-static int check_affinity_params(int ncpus, size_t len, __kernel_cpu_set_t* user_mask_ptr) {
+static int check_affinity_params(bool is_getaffinity,  int ncpus, size_t len, __kernel_cpu_set_t* user_mask_ptr) {
     /* Check that user_mask_ptr is valid; if not, should return -EFAULT */
     if (test_user_memory(user_mask_ptr, len, true))
         return -EFAULT;
@@ -147,8 +147,16 @@ static int check_affinity_params(int ncpus, size_t len, __kernel_cpu_set_t* user
      * implementation, round up the result to sizeof(long) */
     size_t bitmask_long_count    = (ncpus + sizeof(long) * 8 - 1) / (sizeof(long) * 8);
     size_t bitmask_size_in_bytes = bitmask_long_count * sizeof(long);
-    if (len < bitmask_size_in_bytes)
+    
+    /* Return -EINVAL for sched_getaffinity() and, in kernels before 2.6.9,
+     * sched_setaffinity() when len is smaller than size of aafinity mask
+     * used by kernel.
+     */
+    if (is_getaffinity && (len < bitmask_size_in_bytes)) {
+        SYS_PRINTF("[WARNING]: CPU bitmask len must be %lu but supplied bitmask len is only %lu\n", bitmask_size_in_bytes, len);
         return -EINVAL;
+    }
+
     /* Linux kernel also rejects non-natural size */
     if (len & (sizeof(long) - 1))
         return -EINVAL;
@@ -157,52 +165,74 @@ static int check_affinity_params(int ncpus, size_t len, __kernel_cpu_set_t* user
 }
 
 int shim_do_sched_setaffinity(pid_t pid, size_t len, __kernel_cpu_set_t* user_mask_ptr) {
-    PAL_HANDLE thread = NULL;
+    PAL_HANDLE pal_thread = NULL;
+    struct shim_thread* thread;
     int ncpus = PAL_CB(cpu_info.cpu_num);
 
-    struct shim_thread* cur_thread = get_cur_thread();
-    if (!cur_thread)
-        return -ESRCH;
-
-    thread = cur_thread->pal_handle;
-
-    /* to set other thread requires host tid mapping */
-    if (pid != 0) {
-        debug("The thread id: %d is not supported for now.\n", pid);
-        return -ENOSYS;
+    if (pid) {
+        thread = lookup_thread(pid);
+    } else {
+        thread = get_cur_thread();
+        get_thread(thread);
     }
 
-    int bitmask_size_in_bytes = check_affinity_params(ncpus, len, user_mask_ptr);
-    if (bitmask_size_in_bytes < 0)
-        return bitmask_size_in_bytes;
+    if (!thread) {
+        debug("shim_do_sched_setaffinity: shim thread is NULL\n");
+        return -ESRCH;
+    }
 
-    if (!DkThreadSetCPUAffinity(thread, bitmask_size_in_bytes, user_mask_ptr)) {
+    pal_thread = thread->pal_handle;
+    if (!pal_thread) {
+        debug("shim_do_sched_setaffinity: pal thread is NULL\n");
+        return -ESRCH;
+    }
+    put_thread(thread);
+
+    int bitmask_size_in_bytes = check_affinity_params(false, ncpus, len, user_mask_ptr);
+    if (bitmask_size_in_bytes < 0) {
+        debug("shim_do_sched_setaffinity: bitmask_size_in_bytes=%d\n", bitmask_size_in_bytes);
+        return bitmask_size_in_bytes;
+    }
+
+    if (!DkThreadSetCPUAffinity(pal_thread, bitmask_size_in_bytes, user_mask_ptr)) {
+        debug("shim_do_sched_setaffinity: DkThreadSetCPUAffinity FAILED\n");
         return -PAL_ERRNO();
     }
     return 0;
 }
 
 int shim_do_sched_getaffinity(pid_t pid, size_t len, __kernel_cpu_set_t* user_mask_ptr) {
-    PAL_HANDLE thread = NULL;
+    PAL_HANDLE pal_thread = NULL;
+    struct shim_thread* thread;
     int ncpus = PAL_CB(cpu_info.cpu_num);
 
-    struct shim_thread* cur_thread = get_cur_thread();
-    if (!cur_thread)
-        return -ESRCH;
-
-    thread = cur_thread->pal_handle;
-
-    /* to set other thread requires host tid mapping */
-    if (pid != 0) {
-        debug("The thread id: %d is not supported for now.\n", pid);
-        return -ENOSYS;
+    if (pid) {
+        thread = lookup_thread(pid);
+    } else {
+        thread = get_cur_thread();
+        get_thread(thread);
     }
 
-    int bitmask_size_in_bytes = check_affinity_params(ncpus, len, user_mask_ptr);
-    if (bitmask_size_in_bytes < 0)
-        return bitmask_size_in_bytes;
+    if (!thread) {
+        debug("shim_do_sched_getaffinity: shim thread is NULL\n");
+        return -ESRCH;
+    }
 
-    if (!DkThreadGetCPUAffinity(thread, bitmask_size_in_bytes, user_mask_ptr)) {
+    pal_thread = thread->pal_handle;
+    if (!pal_thread) {
+        debug("shim_do_sched_getaffinity: pal thread is NULL\n");
+        return -ESRCH;
+    }
+    put_thread(thread);
+
+    int bitmask_size_in_bytes = check_affinity_params(true, ncpus, len, user_mask_ptr);
+    if (bitmask_size_in_bytes < 0) {
+        debug("shim_do_sched_getaffinity: bitmask_size_in_bytes=%d\n", bitmask_size_in_bytes);
+        return bitmask_size_in_bytes;
+    }
+
+    if (!DkThreadGetCPUAffinity(pal_thread, bitmask_size_in_bytes, user_mask_ptr)) {
+        debug("shim_do_sched_getaffinity: DkThreadGetCPUAffinity FAILED\n");
         return -PAL_ERRNO();
     }
     /* on success, imitate Linux kernel implementation: see SYSCALL_DEFINE3(sched_getaffinity) */

@@ -37,6 +37,7 @@ struct thread_param {
 
 extern void* g_enclave_base;
 
+#if 0
 /*
  * We do not currently handle tid counter wrap-around, and could, in
  * principle, end up with two threads with the same ID. This is ok, as strict
@@ -48,6 +49,7 @@ static PAL_IDX pal_assign_tid(void)
     static struct atomic_int tid = ATOMIC_INIT(0);
     return __atomic_add_fetch(&tid.counter, 1, __ATOMIC_SEQ_CST);
 }
+#endif
 
 void pal_start_thread (void)
 {
@@ -57,7 +59,6 @@ void pal_start_thread (void)
     LISTP_FOR_EACH_ENTRY(tmp, &g_thread_list, list)
         if (!tmp->tcs) {
             new_thread = tmp;
-            new_thread->tid = pal_assign_tid();
             new_thread->tcs = g_enclave_base + GET_ENCLAVE_TLS(tcs_offset);
             break;
         }
@@ -105,7 +106,7 @@ int _DkThreadCreate (PAL_HANDLE * handle, int (*callback) (void *),
     LISTP_ADD_TAIL(&new_thread->thread, &g_thread_list, list);
     _DkInternalUnlock(&g_thread_list_lock);
 
-    int ret = ocall_clone_thread();
+    int ret = ocall_clone_thread(&new_thread->thread.tid);
     if (IS_ERR(ret))
         return unix_to_pal_error(ERRNO(ret));
 
@@ -153,31 +154,13 @@ int _DkThreadResume (PAL_HANDLE threadHandle)
 
 int _DkThreadSetCPUAffinity(PAL_HANDLE thread, PAL_NUM cpu_len, PAL_PTR cpu_mask)
 {
-    int tid;
-    if (thread != (PAL_HANDLE)GET_ENCLAVE_TLS(thread)) {
-        SGX_DBG(DBG_M, "[Warning] the host tid not supported in SGX mode, using tid:0 instead.");
-        tid = 0;
-    } else {
-        /* TODO: add actual host_tid to pal_thread handle and use it here */
-        tid = 0;
-    }
-
-    int ret = ocall_sched_setaffinity(tid, cpu_len, cpu_mask);
+    int ret = ocall_sched_setaffinity(thread->thread.tid, cpu_len, cpu_mask);
     return IS_ERR(ret) ? unix_to_pal_error(ERRNO(ret)) : ret;
 }
 
 int _DkThreadGetCPUAffinity(PAL_HANDLE thread, PAL_NUM cpu_len, PAL_PTR cpu_mask)
 {
-    int tid;
-    if (thread != (PAL_HANDLE)GET_ENCLAVE_TLS(thread)) {
-        SGX_DBG(DBG_M, "[Warning] the host tid not supported in SGX mode, using tid:0 instead.");
-        tid = 0;
-    } else {
-        /* TODO: add actual host_tid to pal_thread handle and use it here */
-        tid = 0;
-    }
-
-    int ret = ocall_sched_getaffinity(tid, cpu_len, cpu_mask);
+    int ret = ocall_sched_getaffinity(thread->thread.tid, cpu_len, cpu_mask);
     return IS_ERR(ret) ? unix_to_pal_error(ERRNO(ret)) : ret;
 }
 

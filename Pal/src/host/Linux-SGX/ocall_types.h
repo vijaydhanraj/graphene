@@ -293,4 +293,8 @@ typedef struct {
     size_t            ms_quote_len;
 } ms_ocall_get_quote_t;
 
+typedef struct {
+    PAL_IDX ms_tid;
+} ms_ocall_clone_thread_t;
+
 #pragma pack(pop)
