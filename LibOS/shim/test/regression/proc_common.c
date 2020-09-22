@@ -19,9 +19,9 @@ int main(int argc, char** argv) {
     pthread_t thread[3];
     int ret;
     FILE* f;
-    DIR* dir;
-    struct dirent* dirent;
-    char buf[4096];
+    //DIR* dir;
+    //struct dirent* dirent;
+    char buf[24576];
 
     /* create three threads so we have some info in /proc/[pid] */
     for (int j = 0; j < 3; j++) {
@@ -66,6 +66,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+#if 0
     /* at this point, we must have /proc/1, /proc/2, /proc/3, /proc/4 */
     printf("===== Contents of /proc/1\n");
     dir = opendir("/proc/1");
@@ -132,7 +133,7 @@ int main(int argc, char** argv) {
         perror("closedir /proc");
         return 1;
     }
-
+    
     printf("===== Reading /proc/self/exe symlink\n");
     int proc_dirfd = open("/proc", O_DIRECTORY | O_PATH | O_RDONLY);
     if (proc_dirfd < 0) {
@@ -153,6 +154,7 @@ int main(int argc, char** argv) {
 
     buf[len] = '\0';
     printf("symlink /proc/self/exec resolves to %s\n", buf);
+
 
     /* this outputs all files in this current dir: a good test of realloced getdents buffer */
     printf("===== Contents of /proc/2/cwd\n");
@@ -198,7 +200,7 @@ int main(int argc, char** argv) {
         perror("fclose /proc/3/maps");
         return 1;
     }
-
+#endif
     printf("===== Contents of /proc/cpuinfo\n");
     f = fopen("/proc/cpuinfo", "r");
     if (!f) {

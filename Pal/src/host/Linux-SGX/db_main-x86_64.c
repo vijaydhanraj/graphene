@@ -189,6 +189,21 @@ int _DkGetCPUInfo(PAL_CPU_INFO* ci) {
     return rv;
 }
 
+int _DkGetTopologyInfo(PAL_TOPO_INFO* ti) {
+
+    /* copy from pal_sec to pal_control which can be used by LibOS*/
+    ti->num_cpus = g_pal_sec.topo_info.num_cpus;
+    ti->num_nodes = g_pal_sec.topo_info.num_nodes;
+    COPY_ARRAY(ti->cpu_online, g_pal_sec.topo_info.cpu_online);
+    COPY_ARRAY(ti->cpu_possible, g_pal_sec.topo_info.cpu_possible);
+    COPY_ARRAY(ti->node_online, g_pal_sec.topo_info.node_online);
+    COPY_ARRAY(ti->node_possible, g_pal_sec.topo_info.node_possible);
+    COPY_ARRAY(ti->cpu_topology, g_pal_sec.topo_info.cpu_topology);
+    COPY_ARRAY(ti->numa_topology, g_pal_sec.topo_info.numa_topology);
+
+    return 0;
+}
+
 size_t _DkRandomBitsRead(void* buffer, size_t size) {
     uint32_t rand;
     for (size_t i = 0; i < size; i += sizeof(rand)) {

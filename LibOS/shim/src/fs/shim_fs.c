@@ -38,6 +38,11 @@ struct shim_fs mountable_fs[] = {
         .fs_ops = &dev_fs_ops,
         .d_ops  = &dev_d_ops,
     },
+    {
+        .name   = "sys",
+        .fs_ops = &sys_fs_ops,
+        .d_ops  = &sys_d_ops,
+    },
 };
 
 struct shim_mount* builtin_fs[] = {
@@ -112,6 +117,13 @@ static int __mount_sys(struct shim_dentry* root) {
     debug("mounting as proc filesystem: /proc\n");
 
     if ((ret = mount_fs("proc", NULL, "/proc", root, NULL, 0)) < 0) {
+        debug("mounting proc filesystem failed (%d)\n", ret);
+        return ret;
+    }
+
+    debug("mounting as sys filesystem: /sys\n");
+
+    if ((ret = mount_fs("sys", NULL, "/sys", root, NULL, 0)) < 0) {
         debug("mounting proc filesystem failed (%d)\n", ret);
         return ret;
     }

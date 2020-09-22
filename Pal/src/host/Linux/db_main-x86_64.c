@@ -101,11 +101,18 @@ int _DkGetCPUInfo(PAL_CPU_INFO* ci) {
 
     /* we cannot use CPUID(0xb) because it counts even disabled-by-BIOS cores (e.g. HT cores);
      * instead we extract info on number of online CPUs by parsing sysfs pseudo-files */
-    int cores = get_cpu_count();
+    int cores = get_hw_res_count("/sys/devices/system/cpu/cpu0/topology/core_siblings_list");
     if (cores < 0) {
         free(vendor_id);
         free(brand);
         return cores;
+    }
+
+    /* Check if HT is enabled, if so half the cores count.
+     * This is under assumption that there are 2 SMTs per core.
+     */
+    if (get_hw_res_count("/sys/devices/system/cpu/smt/active")) {
+        cores /= 2;
     }
     ci->cpu_num = cores;
 
@@ -150,6 +157,22 @@ int _DkGetCPUInfo(PAL_CPU_INFO* ci) {
     }
 
     return rv;
+}
+
+int _DkGetTopologyInfo(PAL_TOPO_INFO* ti) {
+    int ret;
+
+    /* Get CPU topology information */
+    ret = get_cpu_topo_info(ti);
+    if (ret < 0)
+        return ret;
+
+    /* Get NUMA topology information */
+    ret = get_numa_topo_info(ti);
+    if (ret < 0)
+        return ret;
+
+    return 0;
 }
 
 #if USE_ARCH_RDRAND == 1

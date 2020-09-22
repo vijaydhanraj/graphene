@@ -199,8 +199,9 @@ struct shim_d_ops {
     int (*readdir)(struct shim_dentry* dent, struct shim_dirent** dirent);
 };
 
-#define MAX_PATH     4096
-#define MAX_FILENAME 255
+#define MAX_PATH        4096
+#define MAX_FILENAME    255
+#define SYSFS_FILESIZE  128
 
 DEFINE_LIST(shim_mount);
 struct shim_mount {
@@ -488,6 +489,9 @@ extern struct shim_d_ops dev_d_ops;
 
 extern struct shim_fs_ops proc_fs_ops;
 extern struct shim_d_ops proc_d_ops;
+
+extern struct shim_fs_ops sys_fs_ops;
+extern struct shim_d_ops sys_d_ops;
 
 struct pseudo_name_ops {
     int (*match_name)(const char* name);

@@ -25,6 +25,10 @@ typedef struct pal_tcb PAL_TCB;
 
 #define PAL_LIBOS_TCB_SIZE 256
 
+#define PAL_MAX_CPU          1024
+#define PAL_MAX_NODE         256
+#define PAL_SYSFS_FILESIZE   64
+
 typedef struct pal_tcb {
     struct pal_tcb* self;
     /* uint64_t for alignment */
@@ -185,6 +189,20 @@ static inline bool pal_context_has_user_pagefault(PAL_CONTEXT* context) {
     return !!(context->err & 4);
 }
 
+enum {
+    HUGEPAGES_2M = 0,
+    HUGEPAGES_1G,
+    HUGEPAGES_MAX,
+};
+
+enum {
+    L1_DATA = 0,
+    L1_INST,
+    L2,
+    L3,
+    CACHE_MAX,
+};
+
 /* PAL_CPU_INFO holds /proc/cpuinfo data */
 typedef struct PAL_CPU_INFO_ {
     PAL_NUM cpu_num;
@@ -196,5 +214,46 @@ typedef struct PAL_CPU_INFO_ {
     double  cpu_bogomips;
     PAL_STR cpu_flags;
 } PAL_CPU_INFO;
+
+typedef struct PAL_CPU_CACHE_INFO_ {
+    char shared_cpu_map[PAL_SYSFS_FILESIZE];
+    char level[PAL_SYSFS_FILESIZE];
+    char type[PAL_SYSFS_FILESIZE];
+    char size[PAL_SYSFS_FILESIZE];
+    char coherency_line_size[PAL_SYSFS_FILESIZE];
+    char number_of_sets[PAL_SYSFS_FILESIZE];
+    char physical_line_partition[PAL_SYSFS_FILESIZE];
+} PAL_CPU_CACHE_INFO;
+
+typedef struct PAL_CPU_TOPO_INFO_ {
+    char is_online[PAL_SYSFS_FILESIZE];
+    char core_id[PAL_SYSFS_FILESIZE];
+    char physical_package_id[PAL_SYSFS_FILESIZE];
+    char core_siblings[PAL_SYSFS_FILESIZE];
+    char thread_siblings[PAL_SYSFS_FILESIZE];
+    PAL_CPU_CACHE_INFO cache[CACHE_MAX]; /* 4 levels */
+} PAL_CPU_TOPO_INFO;
+
+typedef struct PAL_NUMA_HUGEPAGE_INFO_ {
+    char nr_hugepages[PAL_SYSFS_FILESIZE];
+} PAL_NUMA_HUGEPAGE_INFO;
+
+typedef struct PAL_NUMA_TOPO_INFO_ {
+    char cpumap[PAL_SYSFS_FILESIZE];
+    char meminfo[2048];
+    char distance[PAL_SYSFS_FILESIZE];
+    PAL_NUMA_HUGEPAGE_INFO hugepages[2];
+} PAL_NUMA_TOPO_INFO;
+
+typedef struct PAL_TOPO_INFO_ {
+    PAL_NUM num_cpus;
+    PAL_NUM num_nodes;
+    char cpu_online[PAL_SYSFS_FILESIZE];
+    char cpu_possible[PAL_SYSFS_FILESIZE];
+    char node_online[PAL_SYSFS_FILESIZE];
+    char node_possible[PAL_SYSFS_FILESIZE];
+    PAL_CPU_TOPO_INFO cpu_topology[PAL_MAX_CPU];
+    PAL_NUMA_TOPO_INFO numa_topology[PAL_MAX_NODE];
+} PAL_TOPO_INFO;
 
 #endif /* PAL_ARCH_H */

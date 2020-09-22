@@ -21,7 +21,13 @@
 #include "pal_linux.h"
 #include "pal_linux_defs.h"
 #include "pal_security.h"
-#include "sysdeps/generic/ldsodefs.h"
+#include <asm/errno.h>
+#include <asm/ioctls.h>
+#include <asm/mman.h>
+#include <elf/elf.h>
+#include <sysdeps/generic/ldsodefs.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define RTLD_BOOTSTRAP
 
@@ -272,8 +278,8 @@ noreturn void pal_linux_main(void* initial_rsp, void* fini_callback) {
  * Returns the number of online CPUs read from /sys/devices/system/cpu/online, -errno on failure.
  * Understands complex formats like "1,3-5,6".
  */
-int get_cpu_count(void) {
-    int fd = INLINE_SYSCALL(open, 3, "/sys/devices/system/cpu/online", O_RDONLY | O_CLOEXEC, 0);
+int get_hw_res_count(const char *filename) {
+    int fd = INLINE_SYSCALL(open, 3, filename, O_RDONLY|O_CLOEXEC, 0);
     if (fd < 0)
         return unix_to_pal_error(ERRNO(fd));
 
@@ -288,7 +294,7 @@ int get_cpu_count(void) {
 
     char* end;
     char* ptr = buf;
-    int cpu_count = 0;
+    int res_count = 0;
     while (*ptr) {
         while (*ptr == ' ' || *ptr == '\t' || *ptr == ',')
             ptr++;
@@ -299,20 +305,20 @@ int get_cpu_count(void) {
 
         if (*end == '\0' || *end == ',' || *end == '\n') {
             /* single CPU index, count as one more CPU */
-            cpu_count++;
+            res_count++;
         } else if (*end == '-') {
             /* CPU range, count how many CPUs in range */
             ptr = end + 1;
             int secondint = (int)strtol(ptr, &end, 10);
             if (secondint > firstint)
-                cpu_count += secondint - firstint + 1; // inclusive (e.g., 0-7, or 8-16)
+                res_count += secondint - firstint + 1; // inclusive (e.g., 0-7, or 8-16)
         }
         ptr = end;
     }
 
-    if (cpu_count == 0)
+    if (res_count == 0)
         return -PAL_ERROR_STREAMNOTEXIST;
-    return cpu_count;
+    return res_count;
 }
 
 ssize_t read_file_buffer(const char* filename, char* buf, size_t buf_size) {
@@ -326,4 +332,176 @@ ssize_t read_file_buffer(const char* filename, char* buf, size_t buf_size) {
     INLINE_SYSCALL(close, 1, fd);
 
     return n;
+}
+
+int get_cpu_topo_info(PAL_TOPO_INFO* ti) {
+    char filename[128];
+    int ret;
+
+    /*Get CPU topology related info*/
+    ret = read_file_buffer("/sys/devices/system/cpu/online", ti->cpu_online, PAL_SYSFS_FILESIZE);
+    if (ret < 0)
+        return ret;
+    ti->cpu_online[ret] = '\0';
+
+    ret = read_file_buffer("/sys/devices/system/cpu/possible", ti->cpu_possible, PAL_SYSFS_FILESIZE);
+    if (ret < 0) {
+        return ret;
+    }
+    ti->cpu_possible[ret] = '\0';
+
+    int num_cpus = get_hw_res_count("/sys/devices/system/cpu/online");
+    if (num_cpus < 0) {
+        return num_cpus;
+    }
+    ti->num_cpus = num_cpus;
+
+    for (int idx = 0; idx < num_cpus; idx++) {
+        /* cpu0 is always online and doesn't have this file */
+        if (idx != 0) {
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/online", idx);
+            ret = read_file_buffer(filename, ti->cpu_topology[idx].is_online, PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            ti->cpu_topology[idx].is_online[ret] = '\0';
+        }
+        
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/cpu/cpu%d/topology/core_id", idx);
+        ret = read_file_buffer(filename, ti->cpu_topology[idx].core_id, PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        ti->cpu_topology[idx].core_id[ret] = '\0';
+
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/cpu/cpu%d/topology/physical_package_id", idx);
+        ret = read_file_buffer(filename, ti->cpu_topology[idx].physical_package_id, PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        ti->cpu_topology[idx].physical_package_id[ret] = '\0';
+
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/cpu/cpu%d/topology/core_siblings", idx);
+        ret = read_file_buffer(filename, ti->cpu_topology[idx].core_siblings, PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        ti->cpu_topology[idx].core_siblings[ret] = '\0';
+
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/cpu/cpu%d/topology/thread_siblings", idx);
+        ret = read_file_buffer(filename, ti->cpu_topology[idx].thread_siblings, PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        ti->cpu_topology[idx].thread_siblings[ret] = '\0';
+        
+        for (int lvl = 0; lvl < CACHE_MAX; lvl++) {
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/shared_cpu_map", idx, lvl);
+            ret = read_file_buffer(filename, ti->cpu_topology[idx].cache[lvl].shared_cpu_map, PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            ti->cpu_topology[idx].cache[lvl].shared_cpu_map[ret] = '\0';
+            
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/level", idx, lvl);
+            ret = read_file_buffer(filename, ti->cpu_topology[idx].cache[lvl].level, PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            ti->cpu_topology[idx].cache[lvl].level[ret] = '\0';
+            
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/type", idx, lvl);
+            ret = read_file_buffer(filename, ti->cpu_topology[idx].cache[lvl].type, PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            ti->cpu_topology[idx].cache[lvl].type[ret] = '\0';
+            
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/coherency_line_size", idx, lvl);
+            ret = read_file_buffer(filename, ti->cpu_topology[idx].cache[lvl].coherency_line_size, PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            ti->cpu_topology[idx].cache[lvl].coherency_line_size[ret] = '\0';
+            
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/number_of_sets", idx, lvl);
+            ret = read_file_buffer(filename, ti->cpu_topology[idx].cache[lvl].number_of_sets, PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            ti->cpu_topology[idx].cache[lvl].number_of_sets[ret] = '\0';
+            
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/physical_line_partition", idx, lvl);
+            ret = read_file_buffer(filename, ti->cpu_topology[idx].cache[lvl].physical_line_partition, PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            ti->cpu_topology[idx].cache[lvl].physical_line_partition[ret] = '\0';
+        }
+    }
+
+    return 0;
+}
+
+int get_numa_topo_info(PAL_TOPO_INFO* ti) {
+    char filename[128];
+    int ret;
+
+    /*Get CPU topology related info*/
+    ret = read_file_buffer("/sys/devices/system/node/online", ti->node_online, PAL_SYSFS_FILESIZE);
+    if (ret < 0)
+        return ret;
+    ti->node_online[ret] = '\0';
+
+    ret = read_file_buffer("/sys/devices/system/node/possible", ti->node_possible, PAL_SYSFS_FILESIZE);
+    if (ret < 0) {
+        return ret;
+    }
+    ti->node_possible[ret] = '\0';
+
+    int num_nodes = get_hw_res_count("/sys/devices/system/node/online");
+    if (num_nodes < 0) {
+        return num_nodes;
+    }
+    ti->num_nodes = num_nodes;
+
+    for (int idx = 0; idx < num_nodes; idx++) {
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/node/node%d/cpumap", idx);
+        ret = read_file_buffer(filename, ti->numa_topology[idx].cpumap, PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        ti->numa_topology[idx].cpumap[ret] = '\0';
+        
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/node/node%d/meminfo", idx);
+        ret = read_file_buffer(filename, ti->numa_topology[idx].meminfo, 2048);
+        if (ret < 0)
+            return ret;
+        ti->numa_topology[idx].meminfo[ret] = '\0';
+        
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/node/node%d/distance", idx);
+        ret = read_file_buffer(filename, ti->numa_topology[idx].distance, PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        ti->numa_topology[idx].distance[ret] = '\0';
+
+        /* Collect hugepages info*/
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/node/node%d/hugepages/hugepages-2048kB/nr_hugepages", idx);
+        ret = read_file_buffer(filename, ti->numa_topology[idx].hugepages[HUGEPAGES_2M].nr_hugepages, PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        ti->numa_topology[idx].hugepages[HUGEPAGES_2M].nr_hugepages[ret] = '\0';
+        
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/node/node%d/hugepages/hugepages-1048576kB/nr_hugepages", idx);
+        ret = read_file_buffer(filename, ti->numa_topology[idx].hugepages[HUGEPAGES_1G].nr_hugepages, PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        ti->numa_topology[idx].hugepages[HUGEPAGES_1G].nr_hugepages[ret] = '\0';
+    }
+
+    return 0;
 }

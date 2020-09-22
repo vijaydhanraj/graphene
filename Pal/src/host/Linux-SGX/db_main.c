@@ -292,6 +292,17 @@ noreturn void pal_linux_main(char* uptr_libpal_uri, size_t libpal_uri_len, char*
         ocall_exit(1, /*is_exitgroup=*/true);
     }
 
+    /* copy topology info from pal_sec */
+    /* TODO: Introduce checks like num_cpus */
+    g_pal_sec.topo_info.num_cpus = sec_info.topo_info.num_cpus;
+    g_pal_sec.topo_info.num_nodes = sec_info.topo_info.num_nodes;
+    COPY_ARRAY(g_pal_sec.topo_info.cpu_online, sec_info.topo_info.cpu_online);
+    COPY_ARRAY(g_pal_sec.topo_info.cpu_possible, sec_info.topo_info.cpu_possible);
+    COPY_ARRAY(g_pal_sec.topo_info.node_online, sec_info.topo_info.node_online);
+    COPY_ARRAY(g_pal_sec.topo_info.node_possible, sec_info.topo_info.node_possible);
+    COPY_ARRAY(g_pal_sec.topo_info.cpu_topology, sec_info.topo_info.cpu_topology);
+    COPY_ARRAY(g_pal_sec.topo_info.numa_topology, sec_info.topo_info.numa_topology);
+
     /* set up page allocator and slab manager */
     init_slab_mgr(g_page_size);
     init_untrusted_slab_mgr();

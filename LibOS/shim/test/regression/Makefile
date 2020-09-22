@@ -76,6 +76,7 @@ c_executables = \
 	str_close_leak \
 	syscall \
 	system \
+	sysfs_topo \
 	tcp_ipv6_v6only \
 	tcp_msg_peek \
 	udp \

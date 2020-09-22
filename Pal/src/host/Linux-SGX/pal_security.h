@@ -39,6 +39,9 @@ struct pal_sec {
     /* Need to pass in the number of cores */
     PAL_NUM num_cpus;
 
+    /* Topology information (only required ones) */
+    PAL_TOPO_INFO topo_info; 
+
 #ifdef DEBUG
     PAL_BOL in_gdb;
 #endif

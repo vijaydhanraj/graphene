@@ -680,12 +680,25 @@ out:
     return ret;
 }
 
+static ssize_t read_file_buffer(const char* filename, char* buf, size_t buf_size) {
+    int fd;
+
+    fd = INLINE_SYSCALL(open, 2, filename, O_RDONLY);
+    if (fd < 0)
+        return fd;
+
+    ssize_t n = INLINE_SYSCALL(read, 3, fd, buf, buf_size);
+    INLINE_SYSCALL(close, 1, fd);
+
+    return n;
+}
+
 /*
  * Returns the number of online CPUs read from /sys/devices/system/cpu/online, -errno on failure.
  * Understands complex formats like "1,3-5,6".
  */
-static int get_cpu_count(void) {
-    int fd = INLINE_SYSCALL(open, 3, "/sys/devices/system/cpu/online", O_RDONLY | O_CLOEXEC, 0);
+static int get_hw_res_count(const char *filename) {
+    int fd = INLINE_SYSCALL(open, 3, filename, O_RDONLY|O_CLOEXEC, 0);
     if (fd < 0)
         return unix_to_pal_error(ERRNO(fd));
 
@@ -700,7 +713,7 @@ static int get_cpu_count(void) {
 
     char* end;
     char* ptr = buf;
-    int cpu_count = 0;
+    int res_count = 0;
     while (*ptr) {
         while (*ptr == ' ' || *ptr == '\t' || *ptr == ',')
             ptr++;
@@ -711,21 +724,219 @@ static int get_cpu_count(void) {
 
         if (*end == '\0' || *end == ',' || *end == '\n') {
             /* single CPU index, count as one more CPU */
-            cpu_count++;
+            res_count++;
         } else if (*end == '-') {
             /* CPU range, count how many CPUs in range */
             ptr = end + 1;
             int secondint = (int)strtol(ptr, &end, 10);
             if (secondint > firstint)
-                cpu_count += secondint - firstint + 1; // inclusive (e.g., 0-7, or 8-16)
+                res_count += secondint - firstint + 1; // inclusive (e.g., 0-7, or 8-16)
         }
         ptr = end;
     }
 
     INLINE_SYSCALL(close, 1, fd);
-    if (cpu_count == 0)
+    if (res_count == 0)
         return -PAL_ERROR_STREAMNOTEXIST;
-    return cpu_count;
+    return res_count;
+}
+
+static int get_cpu_topo_info(struct pal_sec* pal_sec ) {
+    char filename[128];
+    int ret;
+
+    /*Get CPU topology related info*/
+    ret = read_file_buffer("/sys/devices/system/cpu/online", pal_sec->topo_info.cpu_online,
+                            PAL_SYSFS_FILESIZE);
+    if (ret < 0)
+        return ret;
+    pal_sec->topo_info.cpu_online[ret] = '\0';
+
+    ret = read_file_buffer("/sys/devices/system/cpu/possible", pal_sec->topo_info.cpu_possible,
+                            PAL_SYSFS_FILESIZE);
+    if (ret < 0) {
+        return ret;
+    }
+    pal_sec->topo_info.cpu_possible[ret] = '\0';
+
+    int num_cpus = get_hw_res_count("/sys/devices/system/cpu/online");
+    if (num_cpus < 0) {
+        return num_cpus;
+    }
+    pal_sec->topo_info.num_cpus = num_cpus;
+
+    for (int idx = 0; idx < num_cpus; idx++) {
+        /* cpu0 is always online and so this file is not present */
+        if (idx != 0) {
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/online", idx);
+            ret = read_file_buffer(filename, pal_sec->topo_info.cpu_topology[idx].is_online,
+                                   PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            pal_sec->topo_info.cpu_topology[idx].is_online[ret] = '\0';
+        }
+        
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/cpu/cpu%d/topology/core_id", idx);
+        ret = read_file_buffer(filename, pal_sec->topo_info.cpu_topology[idx].core_id,
+                               PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        pal_sec->topo_info.cpu_topology[idx].core_id[ret] = '\0';
+
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/cpu/cpu%d/topology/physical_package_id", idx);
+        ret = read_file_buffer(filename, pal_sec->topo_info.cpu_topology[idx].physical_package_id,
+                               PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        pal_sec->topo_info.cpu_topology[idx].physical_package_id[ret] = '\0';
+
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/cpu/cpu%d/topology/core_siblings", idx);
+        ret = read_file_buffer(filename, pal_sec->topo_info.cpu_topology[idx].core_siblings,
+                               PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        pal_sec->topo_info.cpu_topology[idx].core_siblings[ret] = '\0';
+
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/cpu/cpu%d/topology/thread_siblings", idx);
+        ret = read_file_buffer(filename, pal_sec->topo_info.cpu_topology[idx].thread_siblings,
+                               PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        pal_sec->topo_info.cpu_topology[idx].thread_siblings[ret] = '\0';
+
+        for (int lvl = 0; lvl < CACHE_MAX; lvl++) {
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/shared_cpu_map", idx, lvl);
+            ret = read_file_buffer(filename, pal_sec->topo_info.cpu_topology[idx].cache[lvl].shared_cpu_map,
+                                   PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            pal_sec->topo_info.cpu_topology[idx].cache[lvl].shared_cpu_map[ret] = '\0';
+            
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/level", idx, lvl);
+            ret = read_file_buffer(filename, pal_sec->topo_info.cpu_topology[idx].cache[lvl].level,
+                                   PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            pal_sec->topo_info.cpu_topology[idx].cache[lvl].level[ret] = '\0';
+            
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/type", idx, lvl);
+            ret = read_file_buffer(filename, pal_sec->topo_info.cpu_topology[idx].cache[lvl].type,
+                                   PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            pal_sec->topo_info.cpu_topology[idx].cache[lvl].type[ret] = '\0';
+            
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/size", idx, lvl);
+            ret = read_file_buffer(filename, pal_sec->topo_info.cpu_topology[idx].cache[lvl].size,
+                                   PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            pal_sec->topo_info.cpu_topology[idx].cache[lvl].size[ret] = '\0';
+            
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/coherency_line_size", idx, lvl);
+            ret = read_file_buffer(filename, pal_sec->topo_info.cpu_topology[idx].cache[lvl].coherency_line_size,
+                                   PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            pal_sec->topo_info.cpu_topology[idx].cache[lvl].coherency_line_size[ret] = '\0';
+            
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/number_of_sets", idx, lvl);
+            ret = read_file_buffer(filename, pal_sec->topo_info.cpu_topology[idx].cache[lvl].number_of_sets,
+                                   PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            pal_sec->topo_info.cpu_topology[idx].cache[lvl].number_of_sets[ret] = '\0';
+            
+            snprintf(filename, sizeof(filename),
+                     "/sys/devices/system/cpu/cpu%d/cache/index%d/physical_line_partition", idx, lvl);
+            ret = read_file_buffer(filename, pal_sec->topo_info.cpu_topology[idx].cache[lvl].physical_line_partition,
+                                   PAL_SYSFS_FILESIZE);
+            if (ret < 0)
+                return ret;
+            pal_sec->topo_info.cpu_topology[idx].cache[lvl].physical_line_partition[ret] = '\0';
+        }
+    }
+
+    return 0;
+}
+
+static int get_numa_topo_info(struct pal_sec* pal_sec ) {
+    char filename[128];
+    int ret;
+
+    /*Get CPU topology related info*/
+    ret = read_file_buffer("/sys/devices/system/node/online", pal_sec->topo_info.node_online,
+                            PAL_SYSFS_FILESIZE);
+    if (ret < 0)
+        return ret;
+    pal_sec->topo_info.node_online[ret] = '\0';
+
+    ret = read_file_buffer("/sys/devices/system/node/possible", pal_sec->topo_info.node_possible,
+                            PAL_SYSFS_FILESIZE);
+    if (ret < 0) {
+        return ret;
+    }
+    pal_sec->topo_info.node_possible[ret] = '\0';
+
+    int num_nodes = get_hw_res_count("/sys/devices/system/node/online");
+    if (num_nodes < 0) {
+        return num_nodes;
+    }
+    pal_sec->topo_info.num_nodes = num_nodes;
+
+    for (int idx = 0; idx < num_nodes; idx++) {
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/node/node%d/cpumap", idx);
+        ret = read_file_buffer(filename, pal_sec->topo_info.numa_topology[idx].cpumap,
+                               PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        pal_sec->topo_info.numa_topology[idx].cpumap[ret] = '\0';
+        
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/node/node%d/meminfo", idx);
+        ret = read_file_buffer(filename, pal_sec->topo_info.numa_topology[idx].meminfo, 1024);
+        if (ret < 0)
+            return ret;
+        pal_sec->topo_info.numa_topology[idx].meminfo[ret] = '\0';
+        
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/node/node%d/distance", idx);
+        ret = read_file_buffer(filename, pal_sec->topo_info.numa_topology[idx].distance,
+                               PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        pal_sec->topo_info.numa_topology[idx].distance[ret] = '\0';
+
+        /* Collect hugepages info*/
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/node/node%d/hugepages/hugepages-2048kB/nr_hugepages", idx);
+        ret = read_file_buffer(filename, pal_sec->topo_info.numa_topology[idx].hugepages[HUGEPAGES_2M].nr_hugepages, PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        pal_sec->topo_info.numa_topology[idx].hugepages[HUGEPAGES_2M].nr_hugepages[ret] = '\0';
+
+        snprintf(filename, sizeof(filename),
+                 "/sys/devices/system/node/node%d/hugepages/hugepages-1048576kB/nr_hugepages", idx);
+        ret = read_file_buffer(filename, pal_sec->topo_info.numa_topology[idx].hugepages[HUGEPAGES_1G].nr_hugepages, PAL_SYSFS_FILESIZE);
+        if (ret < 0)
+            return ret;
+        pal_sec->topo_info.numa_topology[idx].hugepages[HUGEPAGES_1G].nr_hugepages[ret] = '\0';
+
+    }
+
+    return 0;
 }
 
 static int load_enclave(struct pal_enclave* enclave, int manifest_fd, char* manifest_uri,
@@ -750,11 +961,28 @@ static int load_enclave(struct pal_enclave* enclave, int manifest_fd, char* mani
     pal_sec->pid = INLINE_SYSCALL(getpid, 0);
     pal_sec->uid = INLINE_SYSCALL(getuid, 0);
     pal_sec->gid = INLINE_SYSCALL(getgid, 0);
-    int num_cpus = get_cpu_count();
+    int num_cpus = get_hw_res_count("/sys/devices/system/cpu/cpu0/topology/core_siblings_list");
     if (num_cpus < 0) {
         return num_cpus;
     }
+
+    /* Check if HT is enabled, if so half the cores count.
+     * This is under assumption that there are 2 SMTs per core.
+     */
+    if (get_hw_res_count("/sys/devices/system/cpu/smt/active")) {
+        num_cpus /= 2;
+    }
     pal_sec->num_cpus = num_cpus;
+
+    /* Get CPU topology information */
+    ret = get_cpu_topo_info(pal_sec);
+    if (ret < 0) 
+        return ret;
+
+    /* Get NUMA topology information */
+    ret = get_numa_topo_info(pal_sec);
+    if (ret < 0) 
+        return ret;
 
 #ifdef DEBUG
     size_t env_i = 0;
