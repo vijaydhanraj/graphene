@@ -7,19 +7,19 @@
 # ./pal_loader openvino.manifest -i input/image.bmp -m model.xml -d CPU
 
 # The executable to load in Graphene.
-loader.exec = file:$(OPENVINO_DIR)/bin/intel64/$(OPENVINO_BUILD)/object_detection_sample_ssd
-loader.argv0_override = object_detection_sample_ssd
+loader.exec = file:$(OPENVINO_DIR)/bin/intel64/$(OPENVINO_BUILD)/benchmark_app
+loader.argv0_override = benchmark_app
 
 # Graphene environment, including the path to the library OS and the debug
 # option (inline/none).
 loader.preload = file:$(GRAPHENE_DIR)/Runtime/libsysdb.so
-loader.debug_type = $(GRAPHENE_DEBUG)
+loader.debug_type = inline 
 
 # Read application arguments directly from the command line. Don't use this on production!
 loader.insecure__use_cmdline_argv = 1
 
 # Environment variables
-loader.env.LD_LIBRARY_PATH = /lib:$(ARCH_LIBDIR):/usr/$(ARCH_LIBDIR)
+loader.env.LD_LIBRARY_PATH = /lib:$(ARCH_LIBDIR):/usr/$(ARCH_LIBDIR):$(OPENVINO_DIR)/inference-engine/temp/tbb/lib
 
 # Mounted FSes. The following "chroot" FSes mount a part of the host FS into the
 # guest. Other parts of the host FS will not be available in the guest.
@@ -54,7 +54,7 @@ fs.mount.cwd.uri = file:$(OPENVINO_DIR)
 # Set the virtual memory size of the SGX enclave. For SGX v1, the enclave
 # size must be specified during signing. If OpenVINO needs more virtual memory
 # than the enclave size, Graphene will not be able to allocate it.
-sgx.enclave_size = 2G
+sgx.enclave_size = 16G
 
 # Set the maximum number of enclave threads. For SGX v1, the number of enclave
 # TCSes must be specified during signing, so the application cannot use more
@@ -64,7 +64,7 @@ sgx.enclave_size = 2G
 # the application can create is (sgx.thread_num - 2).
 #
 # We (somewhat arbitrarily) specify 16 threads since OpenVINO is multithreaded.
-sgx.thread_num = 16
+sgx.thread_num = 196
 
 # SGX trusted libraries
 
@@ -89,11 +89,6 @@ sgx.trusted_files.libnsl = file:$(ARCH_LIBDIR)/libnsl.so.1
 sgx.trusted_files.libcpp = file:/usr/$(ARCH_LIBDIR)/libstdc++.so.6
 sgx.trusted_files.libgcc = file:$(ARCH_LIBDIR)/libgcc_s.so.1
 
-# OpenVINO TBB dependencies
-sgx.trusted_files.libtbbmalloc = file:/usr/$(ARCH_LIBDIR)/libtbbmalloc.so.2
-sgx.trusted_files.libtbb       = file:/usr/$(ARCH_LIBDIR)/libtbb.so.2
-$(LIBTBB_DEBUG)
-
 # OpenVINO main libraries
 sgx.trusted_files.libformatreader                         = file:$(OPENVINO_DIR)/bin/intel64/$(OPENVINO_BUILD)/lib/libformat_reader.so
 sgx.trusted_files.libinferencenegine                      = file:$(OPENVINO_DIR)/bin/intel64/$(OPENVINO_BUILD)/lib/libinference_engine.so
@@ -116,8 +111,13 @@ sgx.trusted_files.libimgproc    = file:$(OPENVINO_DIR)/inference-engine/temp/ope
 sgx.trusted_files.libopencvcore = file:$(OPENVINO_DIR)/inference-engine/temp/opencv_4.3.0_ubuntu18/opencv/lib/libopencv_core.so.4.3
 
 # OpenVINO OMP libraries
-sgx.trusted_files.libiomp5     = file:$(OPENVINO_DIR)/inference-engine/temp/omp/lib/libiomp5.so
+sgx.trusted_files.libtbbmalloc = file:$(OPENVINO_DIR)/inference-engine/temp/tbb/lib/libtbbmalloc.so.2
+sgx.trusted_files.libtbb       = file:$(OPENVINO_DIR)/inference-engine/temp/tbb/lib/libtbb.so.2
+sgx.trusted_files.libtbbbind   = file:$(OPENVINO_DIR)/inference-engine/temp/tbb/lib/libtbbbind.so.2
+$(LIBTBB_DEBUG)
+#sgx.trusted_files.libiomp5     = file:$(OPENVINO_DIR)/inference-engine/temp/omp/lib/libiomp5.so
 
+# OpenVINO TBB dependencies
 # OpenVINO SSD300 model
 sgx.trusted_files.pluginsxml = file:$(OPENVINO_DIR)/bin/intel64/$(OPENVINO_BUILD)/lib/plugins.xml
 sgx.trusted_files.modelxml   = file:$(MODEL_DIR)/VGG_VOC0712Plus_SSD_300x300_ft_iter_160000.xml

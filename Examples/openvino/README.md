@@ -41,7 +41,8 @@ make SGX=1
 
 # run original OpenVINO/object_detection_sample_ssd
 # note that this assumes the Release build of OpenVINO (no DEBUG=1)
-./openvino/bin/intel64/Release/object_detection_sample_ssd -i images/horses.jpg -m model/VGG_VOC0712Plus_SSD_300x300_ft_iter_160000.xml -d CPU
+#./openvino/bin/intel64/Release/object_detection_sample_ssd -i images/horses.jpg -m model/VGG_VOC0712Plus_SSD_300x300_ft_iter_160000.xml -d CPU
+./openvino/bin/intel64/Release/benchmark_app -i images/horses.jpg -m model/VGG_VOC0712Plus_SSD_300x300_ft_iter_160000.xml -d CPU
 
 # run OpenVINO/object_detection_sample_ssd in non-SGX Graphene
 ./pal_loader openvino.manifest -i images/horses.jpg -m model/VGG_VOC0712Plus_SSD_300x300_ft_iter_160000.xml -d CPU
