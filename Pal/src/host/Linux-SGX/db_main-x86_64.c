@@ -189,7 +189,7 @@ int _DkGetCPUInfo(PAL_CPU_INFO* ci) {
     return rv;
 }
 
-int _DkGetTopologyInfo(PAL_TOPO_INFO* ti) {
+int _DkGetTopologyInfo(PAL_TOPO_INFO* ti, PAL_CPU_INFO* ci) {
 
     /* copy from pal_sec to pal_control which can be used by LibOS*/
     ti->num_cpus = g_pal_sec.topo_info.num_cpus;
@@ -200,6 +200,7 @@ int _DkGetTopologyInfo(PAL_TOPO_INFO* ti) {
     COPY_ARRAY(ti->node_possible, g_pal_sec.topo_info.node_possible);
     COPY_ARRAY(ti->cpu_topology, g_pal_sec.topo_info.cpu_topology);
     COPY_ARRAY(ti->numa_topology, g_pal_sec.topo_info.numa_topology);
+    COPY_ARRAY(ci->phy_id, g_pal_sec.phy_id);
 
     return 0;
 }

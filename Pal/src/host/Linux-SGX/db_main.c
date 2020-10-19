@@ -302,6 +302,7 @@ noreturn void pal_linux_main(char* uptr_libpal_uri, size_t libpal_uri_len, char*
     COPY_ARRAY(g_pal_sec.topo_info.node_possible, sec_info.topo_info.node_possible);
     COPY_ARRAY(g_pal_sec.topo_info.cpu_topology, sec_info.topo_info.cpu_topology);
     COPY_ARRAY(g_pal_sec.topo_info.numa_topology, sec_info.topo_info.numa_topology);
+    COPY_ARRAY(g_pal_sec.phy_id, sec_info.phy_id);
 
     /* set up page allocator and slab manager */
     init_slab_mgr(g_page_size);

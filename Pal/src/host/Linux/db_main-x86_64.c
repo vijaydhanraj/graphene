@@ -159,11 +159,11 @@ int _DkGetCPUInfo(PAL_CPU_INFO* ci) {
     return rv;
 }
 
-int _DkGetTopologyInfo(PAL_TOPO_INFO* ti) {
+int _DkGetTopologyInfo(PAL_TOPO_INFO* ti, PAL_CPU_INFO* ci) { 
     int ret;
 
     /* Get CPU topology information */
-    ret = get_cpu_topo_info(ti);
+    ret = get_cpu_topo_info(ti, ci);
     if (ret < 0)
         return ret;
 

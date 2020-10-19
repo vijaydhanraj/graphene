@@ -334,7 +334,7 @@ ssize_t read_file_buffer(const char* filename, char* buf, size_t buf_size) {
     return n;
 }
 
-int get_cpu_topo_info(PAL_TOPO_INFO* ti) {
+int get_cpu_topo_info(PAL_TOPO_INFO* ti, PAL_CPU_INFO* ci) {
     char filename[128];
     int ret;
 
@@ -380,6 +380,7 @@ int get_cpu_topo_info(PAL_TOPO_INFO* ti) {
         if (ret < 0)
             return ret;
         ti->cpu_topology[idx].physical_package_id[ret] = '\0';
+        ci->phy_id[idx] = strtol(ti->cpu_topology[idx].physical_package_id, NULL, 10);
 
         snprintf(filename, sizeof(filename),
                  "/sys/devices/system/cpu/cpu%d/topology/core_siblings", idx);

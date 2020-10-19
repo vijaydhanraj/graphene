@@ -25,8 +25,8 @@ typedef struct pal_tcb PAL_TCB;
 
 #define PAL_LIBOS_TCB_SIZE 256
 
-#define PAL_MAX_CPU          1024
-#define PAL_MAX_NODE         256
+#define PAL_MAX_CPU          256
+#define PAL_MAX_NODE         32
 #define PAL_SYSFS_FILESIZE   64
 
 typedef struct pal_tcb {
@@ -206,6 +206,7 @@ enum {
 /* PAL_CPU_INFO holds /proc/cpuinfo data */
 typedef struct PAL_CPU_INFO_ {
     PAL_NUM cpu_num;
+    PAL_NUM phy_id[PAL_MAX_CPU]; //FIXME: Hardcoded to 256
     PAL_STR cpu_vendor;
     PAL_STR cpu_brand;
     PAL_NUM cpu_family;

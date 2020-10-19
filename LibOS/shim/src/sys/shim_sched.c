@@ -167,7 +167,7 @@ static int check_affinity_params(bool is_getaffinity, int ncpus, size_t cpumask_
 int shim_do_sched_setaffinity(pid_t pid, size_t cpumask_size, __kernel_cpu_set_t* user_mask_ptr) {
     int ret;
     struct shim_thread* thread;
-    int ncpus = PAL_CB(cpu_info.cpu_num);
+    int ncpus = PAL_CB(topo_info.num_cpus);
 
     if (pid) {
         thread = lookup_thread(pid);
@@ -210,7 +210,7 @@ int shim_do_sched_setaffinity(pid_t pid, size_t cpumask_size, __kernel_cpu_set_t
 int shim_do_sched_getaffinity(pid_t pid, size_t cpumask_size, __kernel_cpu_set_t* user_mask_ptr) {
     int ret;
     struct shim_thread* thread;
-    int ncpus = PAL_CB(cpu_info.cpu_num);
+    int ncpus = PAL_CB(topo_info.num_cpus);
 
     if (pid) {
         thread = lookup_thread(pid);

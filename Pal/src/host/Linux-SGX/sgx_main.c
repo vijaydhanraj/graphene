@@ -792,6 +792,7 @@ static int get_cpu_topo_info(struct pal_sec* pal_sec ) {
         if (ret < 0)
             return ret;
         pal_sec->topo_info.cpu_topology[idx].physical_package_id[ret] = '\0';
+        pal_sec->phy_id[idx] = strtol(pal_sec->topo_info.cpu_topology[idx].physical_package_id, NULL, 10);
 
         snprintf(filename, sizeof(filename),
                  "/sys/devices/system/cpu/cpu%d/topology/core_siblings", idx);

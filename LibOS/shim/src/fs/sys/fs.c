@@ -18,7 +18,7 @@ static int sys_info_mode(const char* name, mode_t* mode) {
 
 static int sys_info_stat(const char* name, struct stat* buf) {
     __UNUSED(name);
-    memset(buf, 0, sizeof(struct stat));
+    memset(buf, 0, sizeof(*buf));
     buf->st_dev  = 1;    /* dummy ID of device containing file */
     buf->st_ino  = 1;    /* dummy inode number */
     buf->st_mode = FILE_R_MODE | S_IFREG;
@@ -106,7 +106,7 @@ static int cpu_cache_info_open (struct shim_handle* hdl, const char* name, int f
     if (!str)
         return -ENOMEM;
     int len;
-    int idx;
+    int idx = -1;
 
     /* Extract name of the file */
     /* strrchr doesn't seem to be supported so using strchr*/
@@ -129,6 +129,8 @@ static int cpu_cache_info_open (struct shim_handle* hdl, const char* name, int f
         idx = L2;
     } else if (strstr(name, "index3")) {
         idx = L3;
+    } else {
+        return -ENOENT;
     }
 
     if (!strcmp_static(filename, "shared_cpu_map")) {
@@ -438,8 +440,10 @@ static int sys_info_dir_stat(const char* name, struct stat* buf) {
     /* Both fstat64 and fstat implementations can end up here.
      * commenting the memset below to avoid any memory corruption.
      */
-    //memset(buf, 0, sizeof(struct stat));
+    debug("%s: name=%s\n", __func__, name);
+    memset(buf, 0, sizeof(*buf));
     buf->st_mode  = 0500 | S_IFDIR;
+    buf->st_nlink = 4;  //dummy FIXME: need atleast 2 or more links for hwloc
 
     return 0;
 }

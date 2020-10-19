@@ -39,6 +39,8 @@ struct pal_sec {
     /* Need to pass in the number of cores */
     PAL_NUM num_cpus;
 
+    PAL_NUM phy_id[PAL_MAX_CPU]; //FIXME: Hardcoded to 256
+
     /* Topology information (only required ones) */
     PAL_TOPO_INFO topo_info; 
 

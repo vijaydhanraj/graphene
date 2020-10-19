@@ -68,6 +68,8 @@ include ../../../../Scripts/Makefile.configs
 include ../../../../Scripts/Makefile.manifest
 include ../../../../Scripts/Makefile.Test
 
+CFLAGS += $(shell pkg-config --cflags hwloc)
+LDLIBS-helloworld += $(shell pkg-config --libs hwloc)
 LDLIBS-condvar += -lpthread
 LDLIBS-futextest += -lpthread
 LDLIBS-get_time += -lm

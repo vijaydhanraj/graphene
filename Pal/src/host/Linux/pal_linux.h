@@ -127,7 +127,7 @@ void init_child_process(int parent_pipe_fd, PAL_HANDLE* parent, PAL_HANDLE* exec
                         PAL_HANDLE* manifest);
 
 int get_hw_res_count(const char *filename);
-int get_cpu_topo_info(PAL_TOPO_INFO* ti);
+int get_cpu_topo_info(PAL_TOPO_INFO* ti, PAL_CPU_INFO* ci);
 int get_numa_topo_info(PAL_TOPO_INFO* ti);
 
 ssize_t read_file_buffer(const char* filename, char* buf, size_t buf_size);

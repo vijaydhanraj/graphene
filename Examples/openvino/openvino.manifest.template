@@ -13,7 +13,7 @@ loader.argv0_override = benchmark_app
 # Graphene environment, including the path to the library OS and the debug
 # option (inline/none).
 loader.preload = file:$(GRAPHENE_DIR)/Runtime/libsysdb.so
-loader.debug_type = inline 
+loader.debug_type = none 
 
 # Read application arguments directly from the command line. Don't use this on production!
 loader.insecure__use_cmdline_argv = 1
@@ -86,8 +86,15 @@ sgx.trusted_files.libnssnis = file:$(ARCH_LIBDIR)/libnss_nis.so.2
 sgx.trusted_files.libnsl = file:$(ARCH_LIBDIR)/libnsl.so.1
 
 # OpenVINO C++ dependencies
-sgx.trusted_files.libcpp = file:/usr/$(ARCH_LIBDIR)/libstdc++.so.6
-sgx.trusted_files.libgcc = file:$(ARCH_LIBDIR)/libgcc_s.so.1
+sgx.trusted_files.libcpp  = file:/usr/$(ARCH_LIBDIR)/libstdc++.so.6
+sgx.trusted_files.libgcc  = file:$(ARCH_LIBDIR)/libgcc_s.so.1
+
+sgx.trusted_files.libnuma    = file:/usr/$(ARCH_LIBDIR)/libnuma.so.1
+sgx.trusted_files.libxml2    = file:/usr/$(ARCH_LIBDIR)/libxml2.so.2
+sgx.trusted_files.libicuuc   = file:/usr/$(ARCH_LIBDIR)/libicuuc.so.60
+sgx.trusted_files.libz       = file:$(ARCH_LIBDIR)/libz.so.1
+sgx.trusted_files.liblzma    = file:$(ARCH_LIBDIR)/liblzma.so.5
+sgx.trusted_files.libicudata = file:/usr/$(ARCH_LIBDIR)/libicudata.so.60
 
 # OpenVINO main libraries
 sgx.trusted_files.libformatreader                         = file:$(OPENVINO_DIR)/bin/intel64/$(OPENVINO_BUILD)/lib/libformat_reader.so
@@ -114,6 +121,7 @@ sgx.trusted_files.libopencvcore = file:$(OPENVINO_DIR)/inference-engine/temp/ope
 sgx.trusted_files.libtbbmalloc = file:$(OPENVINO_DIR)/inference-engine/temp/tbb/lib/libtbbmalloc.so.2
 sgx.trusted_files.libtbb       = file:$(OPENVINO_DIR)/inference-engine/temp/tbb/lib/libtbb.so.2
 sgx.trusted_files.libtbbbind   = file:$(OPENVINO_DIR)/inference-engine/temp/tbb/lib/libtbbbind.so.2
+sgx.trusted_files.libhwloc     = file:$(OPENVINO_DIR)/inference-engine/temp/tbb/lib/libhwloc.so.5
 $(LIBTBB_DEBUG)
 #sgx.trusted_files.libiomp5     = file:$(OPENVINO_DIR)/inference-engine/temp/omp/lib/libiomp5.so
 

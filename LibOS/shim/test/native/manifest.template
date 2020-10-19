@@ -1,5 +1,7 @@
 loader.preload = file:$(SHIMPATH)
-loader.env.LD_LIBRARY_PATH = /lib
+#loader.env.LD_LIBRARY_PATH = /lib
+loader.env.HWLOC_DEBUG_VERBOSE = 0
+loader.env.LD_LIBRARY_PATH = /lib:/lib/x86_64-linux-gnu:/usr/local/lib:/usr/lib/x86_64-linux-gnu
 loader.debug_type = inline
 loader.syscall_symbol = syscalldb
 loader.insecure__use_cmdline_argv = 1
@@ -7,6 +9,18 @@ loader.insecure__use_cmdline_argv = 1
 fs.mount.lib.type = chroot
 fs.mount.lib.path = /lib
 fs.mount.lib.uri = file:$(LIBCDIR)
+
+fs.mount.lib2.type = chroot
+fs.mount.lib2.path = /lib/x86_64-linux-gnu
+fs.mount.lib2.uri = file:/lib/x86_64-linux-gnu
+
+fs.mount.lib3.type = chroot
+fs.mount.lib3.path = /usr
+fs.mount.lib3.uri = file:/usr
+
+fs.mount.lib4.type = chroot
+fs.mount.lib4.path = /usr/lib/x86_64-linux-gnu
+fs.mount.lib4.uri = file:/usr/lib/x86_64-linux-gnu
 
 fs.mount.bin.type = chroot
 fs.mount.bin.path = /bin
@@ -20,5 +34,6 @@ sgx.trusted_files.libc = file:$(LIBCDIR)/libc.so.6
 sgx.trusted_files.libdl = file:$(LIBCDIR)/libdl.so.2
 sgx.trusted_files.libm = file:$(LIBCDIR)/libm.so.6
 sgx.trusted_files.libpthread = file:$(LIBCDIR)/libpthread.so.0
+sgx.trusted_files.libhwloc = file:/usr/local/lib/libhwloc.so.5
 
 sgx.trusted_files.tcp_c = file:tcp.c

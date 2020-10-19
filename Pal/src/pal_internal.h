@@ -204,7 +204,7 @@ unsigned long _DkMemoryQuota(void);
 unsigned long _DkMemoryAvailableQuota(void);
 // Returns 0 on success, negative PAL code on failure
 int _DkGetCPUInfo (PAL_CPU_INFO * info);
-int _DkGetTopologyInfo(PAL_TOPO_INFO* ti);
+int _DkGetTopologyInfo(PAL_TOPO_INFO* ti, PAL_CPU_INFO* ci);
 
 /* Internal DK calls, in case any of the internal routines needs to use them */
 /* DkStream calls */
