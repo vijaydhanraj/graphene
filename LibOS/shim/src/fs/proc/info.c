@@ -188,3 +188,63 @@ struct pseudo_fs_ops fs_cpuinfo = {
     .stat = &proc_info_stat,
     .open = &proc_cpuinfo_open,
 };
+
+static int proc_cpustat_open(struct shim_handle* hdl, const char* name, int flags) {
+    // This function only serves one file
+    __UNUSED(name);
+
+    if (flags & (O_WRONLY | O_RDWR))
+        return -EACCES;
+
+    size_t len = 0,
+           max = 128;
+    char* str = malloc(max);
+    if (!str) {
+        return -ENOMEM;
+    }
+
+
+#define ADD_INFO(fmt, ...)                                           \
+    do {                                                             \
+        int ret = print_to_str(&str, len, &max, fmt, ##__VA_ARGS__); \
+        if (ret < 0) {                                               \
+            free(str);                                               \
+            return ret;                                              \
+        }                                                            \
+        len += ret;                                                  \
+    } while (0)
+
+    ADD_INFO("cpu 50 50 50 50 50 50 50 50 50 50\n");
+    for (size_t n = 0; n <  pal_control.cpu_info.cpu_num; n++) {
+        ADD_INFO("cpu%d 50 50 50 50 50 50 50 50 50 50\n", n);
+    }
+    ADD_INFO("intr 50 50 50\n");
+    ADD_INFO("ctxt 50\n");
+    ADD_INFO("btime 50\n");
+    ADD_INFO("processes 50\n");
+    ADD_INFO("procs_running 50\n");
+    ADD_INFO("procs_blocked 50\n");
+    ADD_INFO("softirq 50 50 50\n");
+
+#undef ADD_INFO
+
+    struct shim_str_data* data = calloc(1, sizeof(struct shim_str_data));
+    if (!data) {
+        free(str);
+        return -ENOMEM;
+    }
+
+    data->str          = str;
+    data->len          = len;
+    hdl->type          = TYPE_STR;
+    hdl->flags         = flags & ~O_RDONLY;
+    hdl->acc_mode      = MAY_READ;
+    hdl->info.str.data = data;
+    return 0;
+}
+
+struct pseudo_fs_ops fs_cpustat = {
+    .mode = &proc_info_mode,
+    .stat = &proc_info_stat,
+    .open = &proc_cpustat_open,
+};

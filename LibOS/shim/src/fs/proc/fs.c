@@ -21,8 +21,10 @@ extern const struct pseudo_fs_ops fs_meminfo;
 
 extern const struct pseudo_fs_ops fs_cpuinfo;
 
+extern const struct pseudo_fs_ops fs_cpustat;
+
 static const struct pseudo_dir proc_root_dir = {
-    .size = 5,
+    .size = 6,
     .ent  = {
         {.name     = "self",
          .fs_ops   = &fs_thread,
@@ -39,6 +41,9 @@ static const struct pseudo_dir proc_root_dir = {
         {.name     = "cpuinfo",
          .fs_ops   = &fs_cpuinfo,
          .type     = LINUX_DT_REG},
+        {.name     = "stat",
+         .fs_ops   = &fs_cpustat,
+         .type     = LINUX_DT_REG },
     }};
 
 static const struct pseudo_fs_ops proc_root_fs = {
